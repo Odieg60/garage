@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulation Parking Garage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simulation Parking Garage</h1>
+    <canvas id="garageCanvas" width="1100" height="600"></canvas>
+    <div class="controls">
+        <button id="rotatePortsche">Rotation Porsche</button>
+        <button id="rotateGolf">Rotation Golf</button>
+        <button id="rotateCiterne">Rotation Citerne</button>
+        <button id="rotatePac">Rotation PAC</button>
+    </div>
+
+    <script>
+        // Paramètres de la fenêtre et du garage
+        const WIDTH = 1100;
+        const HEIGHT = 600;
+        const GARAGE_WIDTH_ENTREE = 430; // 4.30m en cm
+        const GARAGE_WIDTH_FOND = 554; // 5.54m en cm
+        const GARAGE_DEPTH = 836; // 8.36m en cm
+        const DECOUCHEMENT_POS = 400; // Décrochement à 4m en cm
+        const SCALE = 0.5; // Échelle pour affichage
+
+        // Dimensions des voitures et blocs
+        const PORSCHE_LENGTH = 445; // 4.45m en cm
+        const PORSCHE_WIDTH = 185; // 1.85m en cm
+        const GOLF_LENGTH = 399; // 3.99m en cm
+        const GOLF_WIDTH = 166; // 1.66m en cm
+
+        const CITERNE_LENGTH = 228; // 2.28m en cm
+        const CITERNE_WIDTH = 88; // 0.88m en cm
+        const PAC_LENGTH = 268; // 2.68m en cm
+        const PAC_WIDTH = 100; // 1.00m en cm
+
+        // Couleurs
+        const WHITE = "#FFFFFF";
+        const GRAY = "#C8C8C8";
+        const BLACK = "#000000";
+        const LIGHT_GRAY = "#DCDCDC";
+
+        // Récupération du canvas et du contexte
+        const canvas = document.getElementById('garageCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Objects (voitures et blocs)
+        const objects = {
+            "porsche": { 
+                pos: [200, 200], 
+                angle: 0, 
+                img: new Image(),
+                width: PORSCHE_LENGTH * SCALE,
+                height: PORSCHE_WIDTH * SCALE
+            },
+            "golf": { 
+                pos: [300, 300], 
+                angle: 0, 
+                img: new Image(),
+                width: GOLF_LENGTH * SCALE,
+                height: GOLF_WIDTH * SCALE
+            },
+            "citerne": { 
+                pos: [150, 400], 
+                angle: 0, 
+                size: [CITERNE_LENGTH * SCALE, CITERNE_WIDTH * SCALE]
+            },
+            "pac": { 
+                pos: [400, 400], 
+                angle: 0, 
+                size: [PAC_LENGTH * SCALE, PAC_WIDTH * SCALE]
+            }
+        };
+
+        // Définition des boutons (pour les collisions)
+        const buttons = {
+            "porsche_rotate": { x: 950, y: 200, width: 120, height: 40 },
+            "golf_rotate": { x: 950, y: 250, width: 120, height: 40 },
+            "citerne_rotate": { x: 950, y: 300, width: 120, height: 40 },
+            "pac_rotate": { x: 950, y: 350, width: 120, height: 40 }
+        };
+
+        // Charger les images depuis le dossier racine
+        objects.porsche.img.src = "991.png"; // Image de la Porsche
+        objects.golf.img.src = "g60.png"; // Image de la Golf
+
+        // Variable pour suivre l'objet actuellement déplacé
+        let dragging = null;
+        // Position du clic pour le déplacement
+        let offsetX = 0;
+        let offsetY = 0;
+
+        // Fonctions de dessin
+        function drawGarage() {
+            ctx.strokeStyle = GRAY;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            // Mur du fond
+            ctx.moveTo(100, 100);
+            ctx.lineTo(100 + GARAGE_WIDTH_FOND * SCALE, 100);
+            // Mur droit jusqu'au décrochement
+            ctx.lineTo(100 + GARAGE_WIDTH_FOND * SCALE, 100 + DECOUCHEMENT_POS * SCALE);
+            // Décrochement
+            ctx.lineTo(100 + GARAGE_WIDTH_ENTREE * SCALE, 100 + DECOUCHEMENT_POS * SCALE);
+            // Mur droit après décrochement
+            ctx.lineTo(100 + GARAGE_WIDTH_ENTREE * SCALE, 100 + GARAGE_DEPTH * SCALE);
+            // Mur du bas
+            ctx.lineTo(100, 100 + GARAGE_DEPTH * SCALE);
+            // Mur gauche
+            ctx.lineTo(100, 100);
+            ctx.stroke();
+        }
+
+        function drawCar(obj) {
+            // Sauvegarder le contexte
+            ctx.save();
+            // Déplacer au centre de l'objet
+            ctx.translate(obj.pos[0], obj.pos[1]);
+            // Rotation
+            ctx.rotate(obj.angle * Math.PI / 180);
+            // Dessiner l'image centrée
+            ctx.drawImage(obj.img, -obj.width/2, -obj.height/2, obj.width, obj.height);
+            // Restaurer le contexte
+            ctx.restore();
+        }
+
+        function drawBlock(obj, label) {
+            // Sauvegarder le contexte
+            ctx.save();
+            // Déplacer au centre de l'objet
+            ctx.translate(obj.pos[0], obj.pos[1]);
+            // Rotation
+            ctx.rotate(obj.angle * Math.PI / 180);
+            // Dessiner le rectangle centré
+            ctx.fillStyle = BLACK;
+            ctx.fillRect(-obj.size[0]/2, -obj.size[1]/2, obj.size[0], obj.size[1]);
+            // Texte
+            ctx.fillStyle = WHITE;
+            ctx.font = "24px Arial";
+            ctx.fillText(label, -obj.size[0]/2 + 10, -obj.size[1]/2 + 30);
+            // Restaurer le contexte
+            ctx.restore();
+        }
+
+        function drawButtons() {
+            // Les boutons de rotation sont déjà implémentés en HTML, mais on les dessine quand même
+            // pour respecter le code original
+            ctx.fillStyle = LIGHT_GRAY;
+            for (const [name, button] of Object.entries(buttons)) {
+                ctx.fillRect(button.x, button.y, button.width, button.height);
+                ctx.fillStyle = BLACK;
+                ctx.font = "24px Arial";
+                ctx.fillText("Rotate " + name.split("_")[0].charAt(0).toUpperCase() + name.split("_")[0].slice(1), 
+                            button.x + 10, button.y + 25);
+                ctx.fillStyle = LIGHT_GRAY;
+            }
+        }
+
+        function draw() {
+            // Effacer le canvas
+            ctx.fillStyle = WHITE;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            
+            // Dessiner tous les éléments
+            drawGarage();
+            drawCar(objects.porsche);
+            drawCar(objects.golf);
+            drawBlock(objects.citerne, "Citerne");
+            drawBlock(objects.pac, "PAC");
+            drawButtons();
+            
+            // Relancer l'animation
+            requestAnimationFrame(draw);
+        }
+
+        // Gestionnaires d'événements
+        canvas.addEventListener('mousedown', function(event) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+            
+            // Vérifier si on clique sur un bouton (bien que les boutons HTML soient utilisés)
+            for (const [name, button] of Object.entries(buttons)) {
+                if (mouseX >= button.x && mouseX <= button.x + button.width &&
+                    mouseY >= button.y && mouseY <= button.y + button.height) {
+                    // Rotation de l'objet correspondant
+                    const objName = name.split("_")[0];
+                    objects[objName].angle = (objects[objName].angle + 45) % 360;
+                    return;
+                }
+            }
+            
+            // Vérifier si on clique sur un objet
+            for (const [name, obj] of Object.entries(objects)) {
+                // Zone de détection simplifiée (cercle de rayon 40px)
+                const distance = Math.sqrt(
+                    Math.pow(mouseX - obj.pos[0], 2) + 
+                    Math.pow(mouseY - obj.pos[1], 2)
+                );
+                
+                if (distance < 40) {
+                    dragging = name;
+                    offsetX = mouseX - obj.pos[0];
+                    offsetY = mouseY - obj.pos[1];
+                    return;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', function(event) {
+            if (dragging) {
+                const rect = canvas.getBoundingClientRect();
+                objects[dragging].pos[0] = event.clientX - rect.left;
+                objects[dragging].pos[1] = event.clientY - rect.top;
+            }
+        });
+
+        canvas.addEventListener('mouseup', function() {
+            dragging = null;
+        });
+
+        // Connecter les boutons HTML
+        document.getElementById('rotatePortsche').addEventListener('click', function() {
+            objects.porsche.angle = (objects.porsche.angle + 45) % 360;
+        });
+
+        document.getElementById('rotateGolf').addEventListener('click', function() {
+            objects.golf.angle = (objects.golf.angle + 45) % 360;
+        });
+
+        document.getElementById('rotateCiterne').addEventListener('click', function() {
+            objects.citerne.angle = (objects.citerne.angle + 45) % 360;
+        });
+
+        document.getElementById('rotatePac').addEventListener('click', function() {
+            objects.pac.angle = (objects.pac.angle + 45) % 360;
+        });
+
+        // Attendre que les images soient chargées avant de commencer
+        objects.porsche.img.onload = function() {
+            if (objects.golf.img.complete) {
+                // Lancer l'animation
+                draw();
+            }
+        };
+
+        objects.golf.img.onload = function() {
+            if (objects.porsche.img.complete) {
+                // Lancer l'animation
+                draw();
+            }
+        };
+
+        // Au cas où les images seraient chargées avant d'ajouter les gestionnaires
+        if (objects.porsche.img.complete && objects.golf.img.complete) {
+            draw();
+        }
+    </script>
+</body>
+</html>
