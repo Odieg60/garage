@@ -490,20 +490,18 @@ class PathPlanner {
         // Chemins prédéfinis pour les voitures avec approche en marche avant puis entrée en marche arrière
         const predefinedPaths = {
             "golf": [
-                // Position initiale déjà bien placée pour une entrée en marche arrière
-                { x: 611, y: 577, angle: 270, isReversing: false },
-                
-                // Légère manoeuvre pour s'aligner parfaitement avec la porte
-                { x: doorCenterX, y: 577, angle: 270, isReversing: false },
+                // Position initiale déjà placée pour une entrée directe en marche arrière
+                { x: 611, y: 577, angle: 270, isReversing: true },  // MODIFIÉ: isReversing: true dès le départ
                 
                 // Entrée directe en marche arrière
-                { x: doorCenterX, y: 500, angle: 270, isReversing: true }, // Passage de la porte
-                { x: doorCenterX, y: 400, angle: 315, isReversing: true }, // Début de rotation
-                { x: 620, y: 300, angle: 0, isReversing: true },           // Rotation en cours
+                { x: doorCenterX, y: 550, angle: 270, isReversing: true },  // Alignement avec la porte
+                { x: doorCenterX, y: 450, angle: 270, isReversing: true },  // Passage de la porte
+                { x: doorCenterX, y: 350, angle: 315, isReversing: true },  // Début de rotation
+                { x: 620, y: 250, angle: 0, isReversing: true },            // Rotation en cours
                 
                 // Manœuvre finale
-                { x: 672, y: 200, angle: 0, isReversing: true },           // Approche
-                { x: 672, y: 162, angle: 0, isReversing: true }            // Position finale
+                { x: 672, y: 200, angle: 0, isReversing: true },            // Approche
+                { x: 672, y: 162, angle: 0, isReversing: true }             // Position finale
             ],
             "porsche": [
                 // Phase initiale
