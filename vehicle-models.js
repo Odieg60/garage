@@ -470,6 +470,7 @@ class PurePursuitController {
     }
 }
 
+
 /**
  * Planificateur de trajectoire avec waypoints prédéfinis pour le stationnement en marche arrière
  */
@@ -489,22 +490,20 @@ class PathPlanner {
         // Chemins prédéfinis pour les voitures avec approche en marche avant puis entrée en marche arrière
         const predefinedPaths = {
             "golf": [
-                // Phase initiale: se déplacer vers la position d'approche
-                { x: 515, y: 550, angle: 0, isReversing: false },
-                { x: doorCenterX + 50, y: 700, angle: -30, isReversing: false }, // Position proche de la porte, légèrement décalée
+                // Position initiale déjà bien placée pour une entrée en marche arrière
+                { x: 611, y: 577, angle: 270, isReversing: false },
                 
-                // Point de manœuvre: se positionner pour l'entrée en marche arrière
-                { x: doorCenterX + 150, y: 650, angle: -60, isReversing: false }, // Position de manœuvre
-                { x: doorCenterX + 180, y: 600, angle: -90, isReversing: false }, // Rotation pour faire face à l'extérieur
+                // Légère manoeuvre pour s'aligner parfaitement avec la porte
+                { x: doorCenterX, y: 577, angle: 270, isReversing: false },
                 
-                // Entrée en marche arrière
-                { x: doorCenterX + 140, y: 550, angle: -90, isReversing: true }, // Début marche arrière
-                { x: doorCenterX, y: 500, angle: -45, isReversing: true }, // Entrée du garage en marche arrière
-                { x: doorCenterX - 50, y: 400, angle: -15, isReversing: true }, // Milieu du garage
+                // Entrée directe en marche arrière
+                { x: doorCenterX, y: 500, angle: 270, isReversing: true }, // Passage de la porte
+                { x: doorCenterX, y: 400, angle: 315, isReversing: true }, // Début de rotation
+                { x: 620, y: 300, angle: 0, isReversing: true },           // Rotation en cours
                 
                 // Manœuvre finale
-                { x: 650, y: 250, angle: 0, isReversing: true }, // Dernier ajustement
-                { x: 672, y: 162, angle: 0, isReversing: true }  // Position finale
+                { x: 672, y: 200, angle: 0, isReversing: true },           // Approche
+                { x: 672, y: 162, angle: 0, isReversing: true }            // Position finale
             ],
             "porsche": [
                 // Phase initiale
