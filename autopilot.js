@@ -113,6 +113,66 @@ class AutopilotManager {
             }
         }
         
+        return true;
+    }
+
+    // Dessiner les informations de debug
+    drawDebug(ctx) {
+        if (!this.isRunning || this.currentVehicleIndex >= this.vehicles.length) return;
+        
+        const vehicle = this.vehicles[this.currentVehicleIndex];
+        const controller = this.controllers[vehicle.name];
+        const path = controller.path;
+        
+        if (!path || path.length === 0) return;
+        
+        // Dessiner le chemin complet
+        ctx.strokeStyle = "#FF0000";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(path[0].x, path[0].y);
+        
+        for (let i = 1; i < path.length; i++) {
+            ctx.lineTo(path[i].x, path[i].y);
+        }
+        
+        ctx.stroke();
+        
+        // Dessiner les points du chemin
+        for (let i = 0; i < path.length; i++) {
+            // Waypoints déjà atteints en gris
+            if (i < controller.currentTargetIndex) {
+                ctx.fillStyle = "#888888";
+            } 
+            // Waypoint actuel en vert
+            else if (i === controller.currentTargetIndex) {
+                ctx.fillStyle = "#00FF00";
+            } 
+            // Waypoints à venir en rouge
+            else {
+                ctx.fillStyle = "#FF0000";
+            }
+            
+            ctx.beginPath();
+            ctx.arc(path[i].x, path[i].y, 5, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Pour le waypoint actuel, dessiner le cercle de tolérance
+            if (i === controller.currentTargetIndex) {
+                ctx.strokeStyle = "#00FF00";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                
+                // Tolérance différente selon que c'est le dernier point ou non
+                const tolerance = (i === path.length - 1) 
+                    ? controller.finalTolerance 
+                    : controller.waypointTolerance;
+                
+                ctx.arc(path[i].x, path[i].y, tolerance, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+        }
+        
         // Dessiner le point lookahead
         const targetPoint = controller.findLookaheadPoint();
         if (targetPoint) {
@@ -128,6 +188,69 @@ class AutopilotManager {
             ctx.moveTo(vehicle.obj.pos[0], vehicle.obj.pos[1]);
             ctx.lineTo(targetPoint.x, targetPoint.y);
             ctx.stroke();
+        }
+        
+        // Dessiner l'angle de braquage et la direction du véhicule
+        const headingRad = degToRad(vehicle.obj.angle);
+        
+        // MODIFIÉ: Ajout d'une flèche pour indiquer l'avant du véhicule (vers la gauche)
+        // Dessiner une flèche bleue pointant vers la gauche (avant) du véhicule
+        const leftHeadingRad = degToRad(vehicle.obj.angle + 180);
+        ctx.strokeStyle = "#00AAFF"; // Bleu clair pour l'avant
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(vehicle.obj.pos[0], vehicle.obj.pos[1]);
+        ctx.lineTo(
+            vehicle.obj.pos[0] + Math.cos(leftHeadingRad) * 25,
+            vehicle.obj.pos[1] + Math.sin(leftHeadingRad) * 25
+        );
+        ctx.stroke();
+        
+        // Dessiner une pointe de flèche pour l'avant
+        const arrowSize = 8;
+        ctx.beginPath();
+        ctx.moveTo(
+            vehicle.obj.pos[0] + Math.cos(leftHeadingRad) * 25,
+            vehicle.obj.pos[1] + Math.sin(leftHeadingRad) * 25
+        );
+        ctx.lineTo(
+            vehicle.obj.pos[0] + Math.cos(leftHeadingRad + 0.5) * 20,
+            vehicle.obj.pos[1] + Math.sin(leftHeadingRad + 0.5) * 20
+        );
+        ctx.lineTo(
+            vehicle.obj.pos[0] + Math.cos(leftHeadingRad - 0.5) * 20,
+            vehicle.obj.pos[1] + Math.sin(leftHeadingRad - 0.5) * 20
+        );
+        ctx.closePath();
+        ctx.fillStyle = "#00AAFF";
+        ctx.fill();
+        
+        // Dessiner une flèche rouge pointant vers l'arrière (droite) du véhicule
+        ctx.strokeStyle = "#FF5555"; // Rouge clair pour l'arrière
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(vehicle.obj.pos[0], vehicle.obj.pos[1]);
+        ctx.lineTo(
+            vehicle.obj.pos[0] + Math.cos(headingRad) * 15,
+            vehicle.obj.pos[1] + Math.sin(headingRad) * 15
+        );
+        ctx.stroke();
+        
+        // Dessiner l'angle de braquage - MODIFIÉ: déplacer le point de départ
+        // Maintenant on place l'indicateur de braquage du côté gauche (avant)
+        const frontX = vehicle.obj.pos[0] + Math.cos(leftHeadingRad) * (vehicle.wheelbase/2);
+        const frontY = vehicle.obj.pos[1] + Math.sin(leftHeadingRad) * (vehicle.wheelbase/2);
+        
+        const steeringRad = degToRad(vehicle.obj.angle + vehicle.steeringAngle);
+        ctx.strokeStyle = controller.shouldReverseDirection ? "#FF00FF" : "#00FFFF"; // Magenta si marche arrière
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(frontX, frontY);
+        ctx.lineTo(
+            frontX + Math.cos(steeringRad) * 20,
+            frontY + Math.sin(steeringRad) * 20
+        );
+        ctx.stroke();
         
         // Afficher les informations textuelles
         ctx.fillStyle = "#000000";
@@ -190,125 +313,3 @@ function drawAutopilotDebug(ctx) {
         autopilot.drawDebug(ctx);
     }
 }
-        }
-        
-        // Dessiner l'angle de braquage et la direction du véhicule
-        const headingRad = degToRad(vehicle.obj.angle);
-        
-        // MODIFIÉ: Ajout d'une flèche pour indiquer l'avant du véhicule (vers la gauche)
-        // Dessiner une flèche bleue pointant vers la gauche (avant) du véhicule
-        const leftHeadingRad = degToRad(vehicle.obj.angle + 180);
-        ctx.strokeStyle = "#00AAFF"; // Bleu clair pour l'avant
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(vehicle.obj.pos[0], vehicle.obj.pos[1]);
-        ctx.lineTo(
-            vehicle.obj.pos[0] + Math.cos(leftHeadingRad) * 25,
-            vehicle.obj.pos[1] + Math.sin(leftHeadingRad) * 25
-        );
-        ctx.stroke();
-        
-        // Dessiner une pointe de flèche pour l'avant
-        const arrowSize = 8;
-        ctx.beginPath();
-        ctx.moveTo(
-            vehicle.obj.pos[0] + Math.cos(leftHeadingRad) * 25,
-            vehicle.obj.pos[1] + Math.sin(leftHeadingRad) * 25
-        );
-        ctx.lineTo(
-            vehicle.obj.pos[0] + Math.cos(leftHeadingRad + 0.5) * 20,
-            vehicle.obj.pos[1] + Math.sin(leftHeadingRad + 0.5) * 20
-        );
-        ctx.lineTo(
-            vehicle.obj.pos[0] + Math.cos(leftHeadingRad - 0.5) * 20,
-            vehicle.obj.pos[1] + Math.sin(leftHeadingRad - 0.5) * 20
-        );
-        ctx.closePath();
-        ctx.fillStyle = "#00AAFF";
-        ctx.fill();
-        
-        // Dessiner une flèche rouge pointant vers l'arrière (droite) du véhicule
-        ctx.strokeStyle = "#FF5555"; // Rouge clair pour l'arrière
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(vehicle.obj.pos[0], vehicle.obj.pos[1]);
-        ctx.lineTo(
-            vehicle.obj.pos[0] + Math.cos(headingRad) * 15,
-            vehicle.obj.pos[1] + Math.sin(headingRad) * 15
-        );
-        ctx.stroke();
-        
-        // Dessiner l'angle de braquage
-        const frontX = vehicle.obj.pos[0] + Math.cos(headingRad) * (vehicle.wheelbase/2);
-        const frontY = vehicle.obj.pos[1] + Math.sin(headingRad) * (vehicle.wheelbase/2);
-        
-        const steeringRad = degToRad(vehicle.obj.angle + vehicle.steeringAngle);
-        ctx.strokeStyle = controller.shouldReverseDirection ? "#FF00FF" : "#00FFFF"; // Magenta si marche arrière
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(frontX, frontY);
-        ctx.lineTo(
-            frontX + Math.cos(steeringRad) * 20,
-            frontY + Math.sin(steeringRad) * 20
-        );
-        ctx.stroke();
-        
-        return true;
-    }
-
-    // Dessiner les informations de debug
-    drawDebug(ctx) {
-        if (!this.isRunning || this.currentVehicleIndex >= this.vehicles.length) return;
-        
-        const vehicle = this.vehicles[this.currentVehicleIndex];
-        const controller = this.controllers[vehicle.name];
-        const path = controller.path;
-        
-        if (!path || path.length === 0) return;
-        
-        // Dessiner le chemin complet
-        ctx.strokeStyle = "#FF0000";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(path[0].x, path[0].y);
-        
-        for (let i = 1; i < path.length; i++) {
-            ctx.lineTo(path[i].x, path[i].y);
-        }
-        
-        ctx.stroke();
-        
-        // Dessiner les points du chemin
-        for (let i = 0; i < path.length; i++) {
-            // Waypoints déjà atteints en gris
-            if (i < controller.currentTargetIndex) {
-                ctx.fillStyle = "#888888";
-            } 
-            // Waypoint actuel en vert
-            else if (i === controller.currentTargetIndex) {
-                ctx.fillStyle = "#00FF00";
-            } 
-            // Waypoints à venir en rouge
-            else {
-                ctx.fillStyle = "#FF0000";
-            }
-            
-            ctx.beginPath();
-            ctx.arc(path[i].x, path[i].y, 5, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            // Pour le waypoint actuel, dessiner le cercle de tolérance
-            if (i === controller.currentTargetIndex) {
-                ctx.strokeStyle = "#00FF00";
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                
-                // Tolérance différente selon que c'est le dernier point ou non
-                const tolerance = (i === path.length - 1) 
-                    ? controller.finalTolerance 
-                    : controller.waypointTolerance;
-                
-                ctx.arc(path[i].x, path[i].y, tolerance, 0, 2 * Math.PI);
-                ctx.stroke();
-            }
-        }
