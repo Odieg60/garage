@@ -153,9 +153,18 @@ class AutopilotManager {
                 ctx.fillStyle = "#FF0000";
             }
             
-            ctx.beginPath();
-            ctx.arc(path[i].x, path[i].y, 5, 0, 2 * Math.PI);
-            ctx.fill();
+            // Indiquer différemment les points en marche arrière
+            const isReversing = path[i].isReversing;
+            
+            // Dessiner un carré pour les points en marche arrière, un cercle sinon
+            if (isReversing) {
+                const pointSize = 8;
+                ctx.fillRect(path[i].x - pointSize/2, path[i].y - pointSize/2, pointSize, pointSize);
+            } else {
+                ctx.beginPath();
+                ctx.arc(path[i].x, path[i].y, 5, 0, 2 * Math.PI);
+                ctx.fill();
+            }
             
             // Pour le waypoint actuel, dessiner le cercle de tolérance
             if (i === controller.currentTargetIndex) {
@@ -260,9 +269,16 @@ class AutopilotManager {
         ctx.fillText(`Vitesse: ${vehicle.velocity.toFixed(2)}`, 20, 60);
         ctx.fillText(`Direction: ${vehicle.steeringAngle.toFixed(2)}°`, 20, 80);
         ctx.fillText(`Distance parcourue: ${Math.round(vehicle.totalMovement)}px`, 20, 100);
-        ctx.fillText(`Marche arrière: ${controller.shouldReverseDirection ? "Oui" : "Non"}`, 20, 120);
-        ctx.fillText(`Tentatives: ${controller.stuckCount}/${controller.maxStuckCount}`, 20, 140);
-        ctx.fillText(`Avant du véhicule: Orienté vers la GAUCHE`, 20, 160);
+        
+        // Afficher si c'est une marche arrière (selon le waypoint ou le contrôleur)
+        const currentWaypoint = path[controller.currentTargetIndex];
+        const isReversingByWaypoint = currentWaypoint && currentWaypoint.isReversing;
+        const isReversingByController = controller.shouldReverseDirection;
+        
+        ctx.fillText(`Marche arrière (waypoint): ${isReversingByWaypoint ? "Oui" : "Non"}`, 20, 120);
+        ctx.fillText(`Marche arrière (contrôleur): ${isReversingByController ? "Oui" : "Non"}`, 20, 140);
+        ctx.fillText(`Tentatives: ${controller.stuckCount}/${controller.maxStuckCount}`, 20, 160);
+        ctx.fillText(`Avant du véhicule: Orienté vers la GAUCHE`, 20, 180);
     }
 }
 
