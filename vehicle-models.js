@@ -117,6 +117,7 @@ class VehicleModel {
 
 /**
  * Contrôleur "Pure Pursuit" avec limite de mouvement et inversion
+ * MODIFIÉ: L'avant du véhicule est maintenant orienté vers la gauche (180 degrés)
  */
 class PurePursuitController {
     constructor(vehicle, lookaheadDistance = 30) {
@@ -193,6 +194,7 @@ class PurePursuitController {
         let velocity = this.calculateVelocity(steeringAngle, targetPoint);
         
         // Déterminer si le waypoint est devant ou derrière la voiture
+        // MODIFIÉ: Maintenant l'avant du véhicule est vers la gauche (180 degrés)
         const isWaypointInFront = this.isPointInFrontSector(targetPoint);
         
         // Si le waypoint est devant, on avance; sinon, on recule
@@ -208,7 +210,8 @@ class PurePursuitController {
         return { steeringAngle, velocity };
     }
     
-    // Vérifier si un point est dans le secteur avant de la voiture (±90 degrés)
+    // Vérifier si un point est dans le secteur avant de la voiture
+    // MODIFIÉ: L'avant est maintenant vers la gauche (180 degrés d'offset)
     isPointInFrontSector(point) {
         const pos = this.vehicle.obj.pos;
         const heading = this.vehicle.obj.angle;
@@ -220,9 +223,11 @@ class PurePursuitController {
         ));
         
         // Calculer la différence d'angle
-        const angleDiff = Math.abs(normalizeAngle(heading - pointAngle));
+        // MODIFIÉ: Ajout d'un offset de 180 degrés pour que l'avant soit vers la gauche
+        const headingLeftFacing = normalizeAngle(heading + 180);
+        const angleDiff = Math.abs(normalizeAngle(headingLeftFacing - pointAngle));
         
-        // Si l'angle est inférieur à ±90 degrés, le point est devant
+        // Si l'angle est inférieur à ±90 degrés, le point est devant (selon la nouvelle orientation)
         return angleDiff <= this.frontSectorAngle;
     }
     
@@ -300,7 +305,8 @@ class PurePursuitController {
         if (this.currentTargetIndex >= this.path.length - 1) return;
         
         const pos = this.vehicle.obj.pos;
-        const vehicleHeading = this.vehicle.obj.angle;
+        // MODIFIÉ: Tenir compte de la nouvelle orientation (vers la gauche)
+        const vehicleHeading = normalizeAngle(this.vehicle.obj.angle + 180);
         
         // Chercher le waypoint le plus loin qu'on pourrait directement atteindre
         // Mais pas plus d'un waypoint à la fois pour éviter les sauts trop grands
@@ -365,9 +371,11 @@ class PurePursuitController {
     }
 
     // Calculer l'angle de braquage pour atteindre le point cible
+    // MODIFIÉ: Tenir compte de la nouvelle orientation (vers la gauche)
     calculateSteeringAngle(targetPoint) {
         const pos = this.vehicle.obj.pos;
-        const heading = degToRad(this.vehicle.obj.angle);
+        // MODIFIÉ: Ajouter 180 degrés à l'angle pour que l'avant soit vers la gauche
+        const heading = degToRad(normalizeAngle(this.vehicle.obj.angle + 180));
         
         // Vecteur vers la cible dans le référentiel global
         const globalX = targetPoint.x - pos[0];
