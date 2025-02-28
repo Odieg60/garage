@@ -119,6 +119,9 @@ class VehicleModel {
  * Contrôleur "Pure Pursuit" avec limite de mouvement et inversion
  * MODIFIÉ: L'avant du véhicule est maintenant orienté vers la gauche (180 degrés)
  */
+/**
+ * Contrôleur "Pure Pursuit" modifié pour supporter les points de trajets en marche arrière
+ */
 class PurePursuitController {
     constructor(vehicle, lookaheadDistance = 30) {
         this.vehicle = vehicle;
@@ -154,7 +157,10 @@ class PurePursuitController {
         this.path = path;
         this.currentTargetIndex = 0;
         this.reachedDestination = false;
-        this.shouldReverseDirection = false;
+        
+        // Initialiser shouldReverseDirection en fonction du premier point du chemin
+        this.shouldReverseDirection = path.length > 0 ? !!path[0].isReversing : false;
+        
         this.stuckCount = 0;
         this.waypointChangeTimer = 0;
         this.vehicle.resetMovementCounter();
@@ -194,14 +200,23 @@ class PurePursuitController {
         let velocity = this.calculateVelocity(steeringAngle, targetPoint);
         
         // Déterminer si le waypoint est devant ou derrière la voiture
-        // MODIFIÉ: Maintenant l'avant du véhicule est vers la gauche (180 degrés)
+        // MODIFIÉ: L'avant est maintenant vers la gauche (180 degrés d'offset)
         const isWaypointInFront = this.isPointInFrontSector(targetPoint);
         
-        // Si le waypoint est devant, on avance; sinon, on recule
-        // Sauf si on a forcé l'inversion de direction
+        // Déterminer si le waypoint actuel demande une marche arrière
+        // Récupérer l'information isReversing du point actuel du chemin
+        const currentWaypoint = this.path[this.currentTargetIndex];
+        const shouldReverseByWaypoint = currentWaypoint && currentWaypoint.isReversing;
+        
+        // Priorité aux instructions du chemin pour la marche arrière
+        this.shouldReverseDirection = shouldReverseByWaypoint || this.shouldReverseDirection;
+        
+        // Si le waypoint actuel demande la marche arrière OU si on a décidé de forcer la marche arrière
         if (this.shouldReverseDirection) {
             velocity = -Math.abs(velocity) * 0.7; // Marche arrière forcée (plus lente)
-        } else if (!isWaypointInFront) {
+        }
+        // Si le waypoint ne spécifie pas de direction, utiliser la position relative
+        else if (!isWaypointInFront) {
             velocity = -Math.abs(velocity) * 0.7; // Marche arrière (plus lente)
         } else {
             velocity = Math.abs(velocity); // Marche avant
@@ -248,11 +263,23 @@ class PurePursuitController {
                 console.log(`${this.vehicle.name}: Abandonnant le waypoint ${this.currentTargetIndex} après ${this.stuckCount} tentatives`);
                 this.currentTargetIndex++;
                 this.stuckCount = 0;
-                this.shouldReverseDirection = false;
+                
+                // Mettre à jour shouldReverseDirection en fonction du nouveau waypoint
+                if (this.currentTargetIndex < this.path.length) {
+                    this.shouldReverseDirection = !!this.path[this.currentTargetIndex].isReversing;
+                } else {
+                    this.shouldReverseDirection = false;
+                }
+                
                 this.waypointChangeTimer = 0; // Réinitialiser le timer de changement
             } else {
-                // Sinon, inverser la direction
-                this.shouldReverseDirection = !this.shouldReverseDirection;
+                // Sinon, inverser la direction seulement si le waypoint ne spécifie pas de direction
+                if (this.currentTargetIndex < this.path.length) {
+                    const currentWaypoint = this.path[this.currentTargetIndex];
+                    if (currentWaypoint && typeof currentWaypoint.isReversing !== 'boolean') {
+                        this.shouldReverseDirection = !this.shouldReverseDirection;
+                    }
+                }
             }
             
             // Réinitialiser le compteur de mouvement
@@ -288,7 +315,14 @@ class PurePursuitController {
             } else {
                 // Pour les waypoints intermédiaires, on passe au suivant sans vérifier l'angle
                 this.currentTargetIndex++;
-                this.shouldReverseDirection = false; // Réinitialiser l'inversion de direction
+                
+                // Mettre à jour shouldReverseDirection en fonction du nouveau waypoint
+                if (this.currentTargetIndex < this.path.length) {
+                    this.shouldReverseDirection = !!this.path[this.currentTargetIndex].isReversing;
+                } else {
+                    this.shouldReverseDirection = false;
+                }
+                
                 this.stuckCount = 0;                // Réinitialiser le compteur de tentatives
                 this.vehicle.resetMovementCounter(); // Réinitialiser le compteur de mouvement
                 this.waypointChangeTimer = 0; // Réinitialiser le timer de changement de waypoint
@@ -296,11 +330,8 @@ class PurePursuitController {
         }
     }
     
-    // Vérifier si le véhicule est dans l'axe pour sauter des waypoints
+    // Vérifier si le véhicule est dans l'axe pour sauter des waypoints intermédiaires
     checkAxisAlignment() {
-        // Ne pas faire cette vérification si on est en marche arrière forcée
-        if (this.shouldReverseDirection) return;
-        
         // Ne pas faire cette vérification pour le dernier waypoint
         if (this.currentTargetIndex >= this.path.length - 1) return;
         
@@ -315,8 +346,12 @@ class PurePursuitController {
             const waypoint = this.path[nextIndex];
             const dist = distance(pos[0], pos[1], waypoint.x, waypoint.y);
             
-            // Si le waypoint est à une distance raisonnable
-            if (dist <= this.axisAlignmentDistance) {
+            // MODIFIÉ: Ne pas sauter les waypoints si le prochain demande un changement de direction
+            const currentIsReversing = this.path[this.currentTargetIndex].isReversing;
+            const nextIsReversing = waypoint.isReversing;
+            
+            // Si le waypoint est à une distance raisonnable et n'impose pas un changement de direction
+            if (dist <= this.axisAlignmentDistance && currentIsReversing === nextIsReversing) {
                 // Calculer l'angle vers le waypoint
                 const waypointAngle = radToDeg(Math.atan2(
                     waypoint.y - pos[1],
@@ -331,6 +366,9 @@ class PurePursuitController {
                     console.log(`${this.vehicle.name}: Saut au waypoint suivant (dans l'axe)`);
                     this.vehicle.resetMovementCounter(); // Réinitialiser le compteur de mouvement
                     this.waypointChangeTimer = 0; // Réinitialiser le timer
+                    
+                    // Mettre à jour shouldReverseDirection en fonction du nouveau waypoint
+                    this.shouldReverseDirection = !!waypoint.isReversing;
                 }
             }
         }
@@ -396,12 +434,12 @@ class PurePursuitController {
         // Convertir en angle de braquage
         let steeringAngle = radToDeg(Math.atan(curvature * this.vehicle.wheelbase));
         
-        // Si on recule, inverser l'angle de braquage
+        // MODIFIÉ: Prendre en compte explicitement la marche arrière demandée par le waypoint
+        const isReversing = targetPoint.isReversing || false;
         const isPointInFront = this.isPointInFrontSector(targetPoint);
-        const isMovingForward = !this.shouldReverseDirection && isPointInFront;
-        const isMovingBackward = this.shouldReverseDirection || !isPointInFront;
+        const shouldInvertSteering = (isReversing && isPointInFront) || (!isReversing && !isPointInFront);
         
-        if ((localX < 0 && isMovingForward) || (localX > 0 && isMovingBackward)) {
+        if (shouldInvertSteering) {
             steeringAngle = -steeringAngle;
         }
         
@@ -433,7 +471,7 @@ class PurePursuitController {
 }
 
 /**
- * Planificateur de trajectoire avec waypoints prédéfinis
+ * Planificateur de trajectoire avec waypoints prédéfinis pour le stationnement en marche arrière
  */
 class PathPlanner {
     constructor(startPos, goalPos, obstacles, bounds) {
@@ -448,27 +486,44 @@ class PathPlanner {
 
     // Planifier un chemin de départ à arrivée
     planPath() {
-        // Chemins prédéfinis pour les voitures (avec plus de waypoints pour un mouvement plus progressif)
+        // Chemins prédéfinis pour les voitures avec approche en marche avant puis entrée en marche arrière
         const predefinedPaths = {
             "golf": [
-                { x: 515, y: 550, angle: 0 },
-                { x: doorCenterX, y: 600, angle: 0 },  // Aligner avec la porte
-                { x: doorCenterX, y: 500, angle: 0 },  // Entrée du garage
-                { x: doorCenterX, y: 400, angle: 0 },  // Au milieu du garage
-                { x: 600, y: 350, angle: -45 },       // Commencer à tourner
-                { x: 650, y: 250, angle: -90 },       // Continuer à tourner
-                { x: 672, y: 200, angle: -45 },       // Correction d'angle
-                { x: 672, y: 162, angle: 0 }          // Position finale
+                // Phase initiale: se déplacer vers la position d'approche
+                { x: 515, y: 550, angle: 0, isReversing: false },
+                { x: doorCenterX + 50, y: 700, angle: -30, isReversing: false }, // Position proche de la porte, légèrement décalée
+                
+                // Point de manœuvre: se positionner pour l'entrée en marche arrière
+                { x: doorCenterX + 150, y: 650, angle: -60, isReversing: false }, // Position de manœuvre
+                { x: doorCenterX + 180, y: 600, angle: -90, isReversing: false }, // Rotation pour faire face à l'extérieur
+                
+                // Entrée en marche arrière
+                { x: doorCenterX + 140, y: 550, angle: -90, isReversing: true }, // Début marche arrière
+                { x: doorCenterX, y: 500, angle: -45, isReversing: true }, // Entrée du garage en marche arrière
+                { x: doorCenterX - 50, y: 400, angle: -15, isReversing: true }, // Milieu du garage
+                
+                // Manœuvre finale
+                { x: 650, y: 250, angle: 0, isReversing: true }, // Dernier ajustement
+                { x: 672, y: 162, angle: 0, isReversing: true }  // Position finale
             ],
             "porsche": [
-                { x: 303, y: 344, angle: -90 },
-                { x: 350, y: 500, angle: -45 },       // Avancer en tournant
-                { x: doorCenterX, y: 600, angle: 0 },  // Aligner avec la porte
-                { x: doorCenterX, y: 500, angle: 0 },  // Entrée du garage
-                { x: doorCenterX, y: 400, angle: 0 },  // Au milieu du garage
-                { x: 525, y: 375, angle: -45 },       // Commencer à tourner
-                { x: 562, y: 350, angle: -90 },       // Continuer à tourner
-                { x: 562, y: 332, angle: -90 }        // Position finale
+                // Phase initiale
+                { x: 303, y: 344, angle: -90, isReversing: false },
+                { x: 350, y: 600, angle: -45, isReversing: false }, // Approche initiale
+                
+                // Point de manœuvre
+                { x: doorCenterX + 100, y: 700, angle: 0, isReversing: false }, // Position de manœuvre
+                { x: doorCenterX + 200, y: 650, angle: -45, isReversing: false }, // Rotation face à l'extérieur
+                { x: doorCenterX + 220, y: 600, angle: -90, isReversing: false }, // Prêt pour marche arrière
+                
+                // Entrée en marche arrière
+                { x: doorCenterX + 180, y: 550, angle: -90, isReversing: true }, // Début marche arrière
+                { x: doorCenterX + 50, y: 500, angle: -60, isReversing: true }, // Entrée du garage en marche arrière
+                { x: doorCenterX, y: 400, angle: -30, isReversing: true }, // Milieu du garage
+                
+                // Manœuvre finale
+                { x: 562, y: 350, angle: -90, isReversing: true }, // Approche position finale
+                { x: 562, y: 332, angle: -90, isReversing: true }  // Position finale
             ]
         };
         
@@ -481,8 +536,8 @@ class PathPlanner {
         
         // Chemin par défaut si aucun n'est trouvé
         return [
-            { x: this.startPos.x, y: this.startPos.y, angle: this.startPos.angle },
-            { x: this.goalPos.x, y: this.goalPos.y, angle: this.goalPos.angle }
+            { x: this.startPos.x, y: this.startPos.y, angle: this.startPos.angle, isReversing: false },
+            { x: this.goalPos.x, y: this.goalPos.y, angle: this.goalPos.angle, isReversing: true }
         ];
     }
     
@@ -513,7 +568,10 @@ class PathPlanner {
                     const angleDiff = shortestAngle(current.angle, next.angle);
                     const angle = normalizeAngle(current.angle + angleDiff * t);
                     
-                    smoothed.push({ x, y, angle });
+                    // Conserver l'attribut isReversing du segment actuel
+                    const isReversing = current.isReversing;
+                    
+                    smoothed.push({ x, y, angle, isReversing });
                 }
             }
         }
