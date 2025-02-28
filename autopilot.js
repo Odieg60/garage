@@ -113,6 +113,146 @@ class AutopilotManager {
             }
         }
         
+        // Dessiner le point lookahead
+        const targetPoint = controller.findLookaheadPoint();
+        if (targetPoint) {
+            ctx.fillStyle = "#0000FF";
+            ctx.beginPath();
+            ctx.arc(targetPoint.x, targetPoint.y, 4, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Dessiner une ligne de la voiture au point lookahead
+            ctx.strokeStyle = "#0000FF";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(vehicle.obj.pos[0], vehicle.obj.pos[1]);
+            ctx.lineTo(targetPoint.x, targetPoint.y);
+            ctx.stroke();
+        
+        // Afficher les informations textuelles
+        ctx.fillStyle = "#000000";
+        ctx.font = "12px Arial";
+        ctx.fillText(`Véhicule: ${vehicle.name}`, 20, 20);
+        ctx.fillText(`Waypoint: ${controller.currentTargetIndex}/${path.length-1}`, 20, 40);
+        ctx.fillText(`Vitesse: ${vehicle.velocity.toFixed(2)}`, 20, 60);
+        ctx.fillText(`Direction: ${vehicle.steeringAngle.toFixed(2)}°`, 20, 80);
+        ctx.fillText(`Distance parcourue: ${Math.round(vehicle.totalMovement)}px`, 20, 100);
+        ctx.fillText(`Marche arrière: ${controller.shouldReverseDirection ? "Oui" : "Non"}`, 20, 120);
+        ctx.fillText(`Tentatives: ${controller.stuckCount}/${controller.maxStuckCount}`, 20, 140);
+        ctx.fillText(`Avant du véhicule: Orienté vers la GAUCHE`, 20, 160);
+    }
+}
+
+// Instance globale du gestionnaire d'autopilot
+const autopilot = new AutopilotManager();
+
+// Fonction pour convertir degrés en radians (pour compatibilité avec vehicle-models.js)
+function degToRad(degrees) {
+    return degrees * Math.PI / 180;
+}
+
+// Fonction pour lancer l'animation de stationnement
+function animateParking() {
+    if (!isAnimating) {
+        // Initialiser l'animation
+        isAnimating = true;
+        document.getElementById('animateParking').disabled = true;
+        
+        // Initialiser et démarrer l'autopilot
+        autopilot.init();
+        
+        // Lancer la boucle d'animation
+        animationLoop();
+        
+        // Démarrer le rendu continu
+        requestAnimationFrame(draw);
+    }
+}
+
+// Boucle principale d'animation
+function animationLoop() {
+    if (!isAnimating) return;
+    
+    // Mettre à jour l'autopilot
+    const continueAnimation = autopilot.update();
+    
+    // Si l'animation doit continuer
+    if (continueAnimation) {
+        setTimeout(animationLoop, 20); // ~50fps
+    } else {
+        isAnimating = false;
+    }
+}
+
+// Fonction pour afficher les informations de debug
+function drawAutopilotDebug(ctx) {
+    if (isAnimating) {
+        autopilot.drawDebug(ctx);
+    }
+}
+        }
+        
+        // Dessiner l'angle de braquage et la direction du véhicule
+        const headingRad = degToRad(vehicle.obj.angle);
+        
+        // MODIFIÉ: Ajout d'une flèche pour indiquer l'avant du véhicule (vers la gauche)
+        // Dessiner une flèche bleue pointant vers la gauche (avant) du véhicule
+        const leftHeadingRad = degToRad(vehicle.obj.angle + 180);
+        ctx.strokeStyle = "#00AAFF"; // Bleu clair pour l'avant
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(vehicle.obj.pos[0], vehicle.obj.pos[1]);
+        ctx.lineTo(
+            vehicle.obj.pos[0] + Math.cos(leftHeadingRad) * 25,
+            vehicle.obj.pos[1] + Math.sin(leftHeadingRad) * 25
+        );
+        ctx.stroke();
+        
+        // Dessiner une pointe de flèche pour l'avant
+        const arrowSize = 8;
+        ctx.beginPath();
+        ctx.moveTo(
+            vehicle.obj.pos[0] + Math.cos(leftHeadingRad) * 25,
+            vehicle.obj.pos[1] + Math.sin(leftHeadingRad) * 25
+        );
+        ctx.lineTo(
+            vehicle.obj.pos[0] + Math.cos(leftHeadingRad + 0.5) * 20,
+            vehicle.obj.pos[1] + Math.sin(leftHeadingRad + 0.5) * 20
+        );
+        ctx.lineTo(
+            vehicle.obj.pos[0] + Math.cos(leftHeadingRad - 0.5) * 20,
+            vehicle.obj.pos[1] + Math.sin(leftHeadingRad - 0.5) * 20
+        );
+        ctx.closePath();
+        ctx.fillStyle = "#00AAFF";
+        ctx.fill();
+        
+        // Dessiner une flèche rouge pointant vers l'arrière (droite) du véhicule
+        ctx.strokeStyle = "#FF5555"; // Rouge clair pour l'arrière
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(vehicle.obj.pos[0], vehicle.obj.pos[1]);
+        ctx.lineTo(
+            vehicle.obj.pos[0] + Math.cos(headingRad) * 15,
+            vehicle.obj.pos[1] + Math.sin(headingRad) * 15
+        );
+        ctx.stroke();
+        
+        // Dessiner l'angle de braquage
+        const frontX = vehicle.obj.pos[0] + Math.cos(headingRad) * (vehicle.wheelbase/2);
+        const frontY = vehicle.obj.pos[1] + Math.sin(headingRad) * (vehicle.wheelbase/2);
+        
+        const steeringRad = degToRad(vehicle.obj.angle + vehicle.steeringAngle);
+        ctx.strokeStyle = controller.shouldReverseDirection ? "#FF00FF" : "#00FFFF"; // Magenta si marche arrière
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(frontX, frontY);
+        ctx.lineTo(
+            frontX + Math.cos(steeringRad) * 20,
+            frontY + Math.sin(steeringRad) * 20
+        );
+        ctx.stroke();
+        
         return true;
     }
 
@@ -172,97 +312,3 @@ class AutopilotManager {
                 ctx.stroke();
             }
         }
-        
-        // Dessiner le point lookahead
-        const targetPoint = controller.findLookaheadPoint();
-        if (targetPoint) {
-            ctx.fillStyle = "#0000FF";
-            ctx.beginPath();
-            ctx.arc(targetPoint.x, targetPoint.y, 4, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            // Dessiner une ligne de la voiture au point lookahead
-            ctx.strokeStyle = "#0000FF";
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(vehicle.obj.pos[0], vehicle.obj.pos[1]);
-            ctx.lineTo(targetPoint.x, targetPoint.y);
-            ctx.stroke();
-        }
-        
-        // Dessiner l'angle de braquage
-        const headingRad = degToRad(vehicle.obj.angle);
-        const frontX = vehicle.obj.pos[0] + Math.cos(headingRad) * (vehicle.wheelbase/2);
-        const frontY = vehicle.obj.pos[1] + Math.sin(headingRad) * (vehicle.wheelbase/2);
-        
-        const steeringRad = degToRad(vehicle.obj.angle + vehicle.steeringAngle);
-        ctx.strokeStyle = controller.shouldReverseDirection ? "#FF00FF" : "#00FFFF"; // Magenta si marche arrière
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(frontX, frontY);
-        ctx.lineTo(
-            frontX + Math.cos(steeringRad) * 20,
-            frontY + Math.sin(steeringRad) * 20
-        );
-        ctx.stroke();
-        
-        // Afficher les informations textuelles
-        ctx.fillStyle = "#000000";
-        ctx.font = "12px Arial";
-        ctx.fillText(`Véhicule: ${vehicle.name}`, 20, 20);
-        ctx.fillText(`Waypoint: ${controller.currentTargetIndex}/${path.length-1}`, 20, 40);
-        ctx.fillText(`Vitesse: ${vehicle.velocity.toFixed(2)}`, 20, 60);
-        ctx.fillText(`Direction: ${vehicle.steeringAngle.toFixed(2)}°`, 20, 80);
-        ctx.fillText(`Distance parcourue: ${Math.round(vehicle.totalMovement)}px`, 20, 100);
-        ctx.fillText(`Marche arrière: ${controller.shouldReverseDirection ? "Oui" : "Non"}`, 20, 120);
-        ctx.fillText(`Tentatives: ${controller.stuckCount}/${controller.maxStuckCount}`, 20, 140);
-    }
-}
-
-// Instance globale du gestionnaire d'autopilot
-const autopilot = new AutopilotManager();
-
-// Fonction pour convertir degrés en radians (pour compatibilité avec vehicle-models.js)
-function degToRad(degrees) {
-    return degrees * Math.PI / 180;
-}
-
-// Fonction pour lancer l'animation de stationnement
-function animateParking() {
-    if (!isAnimating) {
-        // Initialiser l'animation
-        isAnimating = true;
-        document.getElementById('animateParking').disabled = true;
-        
-        // Initialiser et démarrer l'autopilot
-        autopilot.init();
-        
-        // Lancer la boucle d'animation
-        animationLoop();
-        
-        // Démarrer le rendu continu
-        requestAnimationFrame(draw);
-    }
-}
-
-// Boucle principale d'animation
-function animationLoop() {
-    if (!isAnimating) return;
-    
-    // Mettre à jour l'autopilot
-    const continueAnimation = autopilot.update();
-    
-    // Si l'animation doit continuer
-    if (continueAnimation) {
-        setTimeout(animationLoop, 20); // ~50fps
-    } else {
-        isAnimating = false;
-    }
-}
-
-// Fonction pour afficher les informations de debug
-function drawAutopilotDebug(ctx) {
-    if (isAnimating) {
-        autopilot.drawDebug(ctx);
-    }
-}
