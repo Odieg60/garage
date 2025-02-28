@@ -102,33 +102,33 @@
         const doorCenterX = garageOffsetX + GARAGE_WIDTH_ENTREE_LEFT * SCALE + (GARAGE_WIDTH_ENTREE_DOOR * SCALE) / 2;
         const doorY = garageOffsetY + GARAGE_DEPTH * SCALE;
 
-        // Objects (voitures et blocs)
-        const objects = {
-            "porsche": { 
-                pos: [303, 344], 
-                angle: 270, 
-                img: new Image(),
-                width: PORSCHE_LENGTH * SCALE,
-                height: PORSCHE_WIDTH * SCALE
-            },
-            "golf": { 
-                pos: [515, 550], 
-                angle: 0, 
-                img: new Image(),
-                width: GOLF_LENGTH * SCALE,
-                height: GOLF_WIDTH * SCALE
-            },
-            "citerne": { 
-                pos: [712, 80], 
-                angle: 0, 
-                size: [CITERNE_LENGTH * SCALE, CITERNE_WIDTH * SCALE]
-            },
-            "pac": { 
-                pos: [572, 83], 
-                angle: 0, 
-                size: [PAC_LENGTH * SCALE, PAC_WIDTH * SCALE]
-            }
-        };
+
+const objects = {
+    "porsche": { 
+        pos: [303, 344], 
+        angle: 270, 
+        img: new Image(),
+        width: PORSCHE_LENGTH * SCALE,
+        height: PORSCHE_WIDTH * SCALE
+    },
+    "golf": { 
+        pos: [611, 577], // Nouvelle position
+        angle: 270,     // Nouvel angle
+        img: new Image(),
+        width: GOLF_LENGTH * SCALE,
+        height: GOLF_WIDTH * SCALE
+    },
+    "citerne": { 
+        pos: [712, 80], 
+        angle: 0, 
+        size: [CITERNE_LENGTH * SCALE, CITERNE_WIDTH * SCALE]
+    },
+    "pac": { 
+        pos: [572, 83], 
+        angle: 0, 
+        size: [PAC_LENGTH * SCALE, PAC_WIDTH * SCALE]
+    }
+};
 
         // Positions finales des voitures
         const finalPositions = {
